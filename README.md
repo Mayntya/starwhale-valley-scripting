@@ -1,7 +1,7 @@
 # 星鲸谷物语 · Starwhale Valley
 
 [![release](https://img.shields.io/github/v/release/Mayntya/starwhale-valley-scripting?color=7ab05c&label=release)](https://github.com/Mayntya/starwhale-valley-scripting/releases/latest)
-[![license](https://img.shields.io/badge/license-MIT-7ab05c)](./README.md#许可)
+[![license](https://img.shields.io/badge/license-MIT-7ab05c)](./LICENSE)
 [![platform](https://img.shields.io/badge/platform-Scripting%20%C2%B7%20iOS-e8c07a)](https://www.scripting.fun)
 
 > 一个住进手机里的像素农场。天色按真实时间流动，庄稼按季节换装，天气取自你头顶那片云——
@@ -27,7 +27,7 @@
 
 | 入口 | 怎么进 | 说明 |
 |---|---|---|
-| **全屏壁纸** | 脚本库 → 点「星鲸谷物语」 | 全屏模态，双击右上角 `✕` 或连点画面三下退出 |
+| **全屏壁纸** | 脚本库 → 点「星鲸谷物语」 | 全屏模态：点右上角 `✕`，或连点画面三下退出 |
 | **首页标签** | Scripting 首页 → 长按空位 → 选「星鲸谷物语」 | 常驻标签，切走自动暂停，不提供退出键（退出会杀掉这个常驻实例） |
 
 想把它当真正的「壁纸」用，走第二个入口：首页标签会一直活着，一整天自己变。
@@ -118,6 +118,7 @@
 ├── hud.tsx                     # 覆盖式控制面板
 ├── whale_day.png               # 精灵表（6 行 × 6/8/8/4 帧，单帧 72×78）
 ├── whale_night.png             # 同姿势的夜间压暗版
+├── LICENSE                     # MIT（不含精灵图与截图）
 └── docs/                       # README 用的截图，不参与打包
 ```
 
@@ -196,4 +197,4 @@ ffmpeg -i src.png -vf "format=rgba,lutrgb=r=0.42*val:g=0.45*val:b=0.60*val" whal
 
 ## 许可
 
-代码以 MIT 授权。`docs/` 里的截图与角色精灵图的版权归各自原作者，不在 MIT 范围内。
+代码以 [MIT](./LICENSE) 授权。`docs/` 里的截图与角色精灵图的版权归各自原作者，不在 MIT 范围内。
