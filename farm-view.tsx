@@ -7,7 +7,7 @@
  */
 
 import { ZStack, TimelineCanvas, Script, useState, useEffect, useRef } from "scripting"
-import { drawFrame, onSpotTouch, tapToWorld } from "./world"
+import { drawFrame, flashAt, onSpotTouch, tapToWorld } from "./world"
 import { FarmHud, SPEEDS } from "./hud"
 import { moveTo, onFootstep, player, type SpotId } from "./player"
 import type { WeatherKind } from "./theme"
@@ -68,8 +68,8 @@ export function FarmView(props: { onExit?: () => void }) {
   const pausedRef = useRef(false)
   const hourRef = useRef(hourOf(Date.now()))
   const prevKindRef = useRef<WeatherKind>("clear")
-  /** 雷雨期下一次打雷的时刻（0 = 还没排） */
-  const thunderAtRef = useRef(0)
+  /** 雷雨期已经打过雷的那个闪电槽位（-1 = 非雷雨） */
+  const flashNRef = useRef(-1)
 
   // 真实天气：一次就够，拿不到就当晴天，绝不让壁纸白屏
   useEffect(() => {
@@ -109,19 +109,6 @@ export function FarmView(props: { onExit?: () => void }) {
         setTick(v => v + 1)
         // 环境音跟时间一起走：暂停/切走就淡下去，引擎不拆，回来立刻有声
         audioUpdate(hourRef.current, kindRef.current, seasonRef.current, !pausedRef.current)
-        // 雨转雷雨那一下先来一记
-        if (kindRef.current === "storm" && prevKindRef.current !== "storm" && !pausedRef.current) {
-          playThunder()
-          thunderAtRef.current = Date.now() + 12000 + Math.random() * 10000
-        }
-        // 雷雨期内接着隔三差五地轰：不然「雷雨」只有一声，剩下全是雨
-        if (kindRef.current === "storm" && !pausedRef.current) {
-          if (thunderAtRef.current === 0) thunderAtRef.current = Date.now() + 2000 + Math.random() * 3000
-          else if (Date.now() >= thunderAtRef.current) {
-            playThunder()
-            thunderAtRef.current = Date.now() + 14000 + Math.random() * 22000
-          }
-        } else thunderAtRef.current = 0
         prevKindRef.current = kindRef.current
         // 她一开口，就把面板叫回来（不然台词看不见），说完再隐去
         if (player.liveNote !== "") {
@@ -204,6 +191,15 @@ export function FarmView(props: { onExit?: () => void }) {
             weather: kindRef.current,
             season: seasonRef.current,
           })
+          // 雷跟着闪电走：同一条节拍表（world.ts 的 flashAt），
+          // 看画面的时候什么节奏亮，就什么节奏响 —— 两边各算一套就会割裂
+          if (kindRef.current === "storm" && !pausedRef.current) {
+            const f = flashAt(time)
+            if (f.visible && f.n !== flashNRef.current) {
+              flashNRef.current = f.n
+              playThunder()
+            }
+          } else flashNRef.current = -1
         }}
         paused={paused || !active}
         schedule={{ minimumInterval: 1 / 24 }}

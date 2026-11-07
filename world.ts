@@ -1091,12 +1091,22 @@ function drawFog(b: Brush, t: number, strength: number) {
   }
 }
 
+/** 闪电的节拍：每 2.8 秒一个槽位，一半的槽位真的闪，闪 0.36 秒。
+ *  画面和声音都从这里取，所以雷一定跟着闪电走 —— 两边各算一套就会割裂。 */
+export const FLASH_SEG = 2.8
+
+export function flashAt(t: number) {
+  const n = Math.floor(t / FLASH_SEG)
+  const local = t - n * FLASH_SEG
+  const lit = hash(n * 3.71) >= 0.5
+  return { n, local, lit, visible: lit && local <= 0.36 }
+}
+
 function drawLightning(b: Brush, t: number) {
-  const seg = 2.8
-  const n = Math.floor(t / seg)
-  if (hash(n * 3.71) < 0.5) return
-  const local = t - n * seg
-  if (local > 0.36) return
+  const f = flashAt(t)
+  if (!f.visible) return
+  const n = f.n
+  const local = f.local
   const a = local < 0.1 ? 0.62 : local < 0.18 ? 0.2 : local < 0.28 ? 0.44 : 0.1
   b.cover("#dbe8ff", a)
   if (local < 0.22) {

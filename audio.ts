@@ -42,7 +42,7 @@ const GAIN: Record<LayerName, number> = {
 export const MASTER = [0, 0.5, 0.9]
 
 /** 合成算法改了就升这个号，旧缓存自动作废 */
-const CACHE_KEY = "amb-v3"
+const CACHE_KEY = "amb-v4"
 
 export type AudioLevel = 0 | 1 | 2
 
@@ -75,7 +75,7 @@ const SFX_VOL: Record<SfxName, number> = {
   cluck: 0.4,
   knock: 0.34,
   rustle: 0.3,
-  thunder: 0.78,
+  thunder: 0.70,
 }
 let sfxNodes: (SfxSlot | null)[] = [null, null, null]
 let sfxBuffers: Partial<Record<SfxName, AVAudioPCMBuffer>> = {}

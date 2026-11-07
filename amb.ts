@@ -140,25 +140,26 @@ export function rain(): Float32Array {
   let hp = 0
   for (let i = -warm; i < n + fade; i++) {
     const w = r() * 2 - 1
-    // 雨底：两极点低通到约 900Hz —— 远景里「正在下雨」的那一片
-    lo1 += 0.22 * (w - lo1)
-    lo2 += 0.22 * (lo1 - lo2)
-    // 瓦面：去低频后压到 2.2kHz，雨点打在瓦上的那层「噼啪」
-    hp += 0.17 * (w - hp)
+    // 雨底：两极点低通到约 650Hz —— 远景里「正在下雨」的那一片
+    lo1 += 0.19 * (w - lo1)
+    lo2 += 0.19 * (lo1 - lo2)
+    // 湿润的中频带：300Hz 到 1kHz 之间那片「喔啦啦」，不往高频爬
+    // （高频一片密集小瞬态 = 下油锅；雨的听感重心在中频）
+    hp += 0.085 * (w - hp)
     const band = w - hp
-    hi1 += 0.55 * (band - hi1)
-    hi2 += 0.55 * (hi1 - hi2)
+    hi1 += 0.30 * (band - hi1)
+    hi2 += 0.30 * (hi1 - hi2)
     if (i < 0) continue
     const u = (i % n) / n
     // 极浅的呼吸（±7%）：再深就变成风的涌了
     const swell = 1 + 0.05 * Math.sin(TAU * u + 0.7) + 0.025 * Math.sin(TAU * 3 * u + 2.1)
-    raw[i] = (lo2 * 1.5 + hi2 * 0.35) * swell
+    raw[i] = (lo2 * 1.2 + hi2 * 0.55) * swell
   }
 
-  // 雨点分两群（这是「像雨」的关键）：
-  //   瓦面噼啪 —— 每秒七十粒、很轻，连成一层细密的底
-  //   近处跳点 —— 每秒十来粒、响度差很大。真实屋檐下永远是「远处一片 + 耳边偶尔一滴」，
-  //                每一滴都一样响就假了
+  // 雨点两群（关键在「不要炸」）：
+  //   瓦面闷点 —— 每秒 16 粒，700–1600Hz，30–50ms 就衰，慢得能彼此叠起来成一层「哗」
+  //   近处跳点 —— 每秒 5 粒，响度差很大，落在耳边
+  // 颗数一多、频率一高、尾巴一短，就会变成油锅。宁可偏闷。
   const grain = (fc: number, q: number, len: number, atk: number) => {
     const buf = new Float32Array(Math.round(len * SR))
     const f = 2 * Math.sin((Math.PI * fc) / SR)
@@ -184,10 +185,10 @@ export function rain(): Float32Array {
       }
     }
   }
-  const drum = [grain(1400, 4, 0.02, 0.001), grain(2100, 4, 0.018, 0.001), grain(2900, 3.5, 0.016, 0.001)]
-  sprinkle(drum, 8 * 70, 0.05, 0.16)
-  const near = [grain(1800, 6, 0.06, 0.004), grain(2500, 6, 0.05, 0.004), grain(3200, 5, 0.045, 0.004)]
-  sprinkle(near, 8 * 12, 0.25, 1)
+  const drum = [grain(700, 5, 0.05, 0.006), grain(1100, 5, 0.042, 0.005), grain(1600, 4.5, 0.034, 0.005)]
+  sprinkle(drum, 8 * 16, 0.07, 0.2)
+  const near = [grain(900, 6, 0.075, 0.006), grain(1300, 6, 0.065, 0.006), grain(1800, 5, 0.055, 0.005)]
+  sprinkle(near, 8 * 5, 0.3, 1)
 
   // 屋檐滴水：几颗下滑水珠，比任何噪声都更像「雨打屋檐」
   for (let k = 0; k < 8; k++) {
@@ -414,47 +415,45 @@ export function rustle(): Float32Array {
 
 /** 雷：远雷，不是炸雷。几个鼓包从低到高滚过去，尾巴拉长 */
 export function thunder(): Float32Array {
-  // 5 秒：一记撕裂 + 长长的滚动。三段各管一个频段，缺一段就不像雷：
-  //   裂 = 3kHz 以上的宽带瞬点（“哐”）；滚 = 80–900Hz 的隆隆（“轰”）；层 = 低频体（胸腔感）
-  const out = new Float32Array(Math.round(5 * SR))
+  // 「厚」不是低频堆出来的，是「慢起音 + 长尾巴 + 中低频实心」。
+  // 快起音 = 脆，高频瞬态 = 脆；所以主击改成 50ms 慢起音，裂声只留一丝。
+  // 体 = 180Hz 两极点（胸腔感）；厚 = 700Hz 低通（小喇叭真正推得动的段）；裂 = 1kHz 高通（只占 1/10）
+  const DUR = 4.8
+  const out = new Float32Array(Math.round(DUR * SR))
   const r = rng(0x11e7)
   const N = out.length
-  let lo = 0
-  let lo2 = 0
-  let mid = 0
+  let b1 = 0
+  let b2 = 0
+  let m1 = 0
   let hp = 0
-  const bumps: [number, number][] = [
-    [0.06, 1],
-    [0.85, 0.72],
-    [2.1, 0.45],
-    [3.5, 0.22],
-  ]
   for (let i = 0; i < N; i++) {
     const t = i / SR
     const w = r() * 2 - 1
-    // 低频体：约 200Hz 再降到 60Hz
-    lo += 0.055 * (w - lo)
-    lo2 += 0.018 * (lo - lo2)
-    // 中频滚：560Hz 低通里的噪 — 手机小喇叭能真正推得动的就是这一段
-    mid += 0.16 * (w - mid)
-    // 高频裂：600Hz 高通（保留 3kHz 以上的瞬态）
-    hp += 0.17 * (w - hp)
+    b1 += 0.05 * (w - b1)
+    b2 += 0.05 * (b1 - b2)
+    m1 += 0.19 * (w - m1)
+    hp += 0.3 * (w - hp)
     const crack = w - hp
 
-    let body = 0
-    let roll = 0
-    let snap = 0
-    for (const [at, amp] of bumps) {
-      const d = t - at
-      if (d > 0) {
-        body += amp * Math.exp(-d * 1.15)
-        roll += amp * Math.exp(-d * 2.2)
-        snap += amp * Math.exp(-d * 14)
-      }
-    }
-    // 滚动要 「抖」：一阵一阵的推拉，否则就是一坨白噪
-    const wob = 0.62 + 0.38 * Math.sin(TAU * 3.3 * t + 0.6)
-    out[i] = lo2 * body * 2.9 + mid * roll * 0.55 * wob + crack * snap * 1.1
+    // 主击：50ms 慢起音 + 慢衰减（1.1s 的时间常数）
+    const atk = Math.min(1, t / 0.05)
+    const main = atk * Math.exp(-t * 0.9)
+    // 滚落：三波越来越低越来越散，像在远处山谷里转一圈回来
+    const roll =
+      0.55 * Math.exp(-((t - 1) * (t - 1)) / 0.3) +
+      0.3 * Math.exp(-((t - 2.3) * (t - 2.3)) / 0.45) +
+      0.15 * Math.exp(-((t - 3.6) * (t - 3.6)) / 0.6)
+    const wob = 0.78 + 0.22 * Math.sin(TAU * 2.1 * t + 0.5)
+    const env = main + roll * wob
+    const edge = 0.22 * Math.exp(-t * 16) * atk
+    out[i] = b2 * env * 1.7 + m1 * env * 2.4 + crack * edge * 0.35
+  }
+
+  // 尾巴 0.6s 收干净：闪电密的时候雷会连着来，硬切在最后一个样本上会“咕”一声
+  const fadeLen = Math.round(0.6 * SR)
+  for (let i = N - fadeLen; i < N; i++) {
+    const q = (N - i) / fadeLen
+    out[i] *= q * q
   }
 
   // 归一化看「中频能量」而不是峰：低频在手机外放上根本推不出声，
@@ -470,7 +469,7 @@ export function thunder(): Float32Array {
     if (a > peak) peak = a
   }
   const midRms = Math.sqrt(e / N) || 1e-9
-  let k = 0.085 / midRms
+  let k = 0.095 / midRms
   if (peak * k > 0.78) k = 0.78 / peak
   for (let i = 0; i < N; i++) out[i] *= k
   return out
