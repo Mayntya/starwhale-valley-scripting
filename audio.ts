@@ -29,20 +29,20 @@ import {
 } from "./amb"
 import { MUSIC_BARS, MUSIC_LEN, MUSIC_SR, finishMusic, renderMusicBars } from "./music"
 
-/** 每层的固定增益：把「权重」翻译成「听感」。嫌吵改这里 */
+/** 每层的固定增益：把「权重」翻译成「听感」。BGM 是主角，这一列是配角 */
 const GAIN: Record<LayerName, number> = {
-  wind: 0.6,
-  birds: 0.55,
-  crickets: 0.4,
-  rain: 0.6,
-  hush: 0.45,
+  wind: 0.4,
+  birds: 0.34,
+  crickets: 0.24,
+  rain: 0.40,
+  hush: 0.28,
 }
 
 /** 三档主音量，0 就是静音（引擎还在，只是全部淡下去） */
 export const MASTER = [0, 0.5, 0.9]
 
 /** 合成算法改了就升这个号，旧缓存自动作废 */
-const CACHE_KEY = "amb-v2"
+const CACHE_KEY = "amb-v3"
 
 export type AudioLevel = 0 | 1 | 2
 
@@ -68,6 +68,15 @@ let format: AVAudioFormat | null = null
 let engine: AVAudioEngine | null = null
 let master: AVAudioMixerNode | null = null
 type SfxSlot = { player: AVAudioPlayerNode; mixer: AVAudioMixerNode }
+/** 每个音效自己的音量。脚步声要比其它都轻 —— 它是点缀，不是节拍器 */
+const SFX_VOL: Record<SfxName, number> = {
+  step: 0.26,
+  splash: 0.46,
+  cluck: 0.4,
+  knock: 0.34,
+  rustle: 0.3,
+  thunder: 0.78,
+}
 let sfxNodes: (SfxSlot | null)[] = [null, null, null]
 let sfxBuffers: Partial<Record<SfxName, AVAudioPCMBuffer>> = {}
 let sfxTurn = 0
@@ -82,8 +91,8 @@ type MusicSlot = { player: AVAudioPlayerNode; mixer: AVAudioMixerNode }
 let musicSlot: MusicSlot | null = null
 let musicBooting = false
 let musicDead = false
-/** BGM 的整体底噪：压到环境音下面一点，它是背景，不是主角 */
-const MUSIC_GAIN = 0.62
+/** BGM 的整体底噪：现在是主角了，压在环境音上面 */
+const MUSIC_GAIN = 0.95
 /** 音乐三档，0 就是「只要白噪音，别放曲」 */
 export const MUSIC_MASTER = [0, 0.5, 1]
 let musicLevel: AudioLevel = 1
@@ -475,6 +484,7 @@ export function playSfx(name: SfxName): void {
         slot = { player, mixer }
         sfxNodes[idx] = slot
       }
+      await slot.mixer.setOutputVolume(SFX_VOL[name])
       await slot.player.scheduleBuffer(buf, { interrupts: true })
       await slot.player.play()
     } catch (e) {

@@ -2,7 +2,7 @@
   "name": "星鲸谷物语",
   "icon": "leaf.fill",
   "color": "rgba(122, 176, 92, 1)",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "runInApp": true,
   "description": "Starwhale Valley — a pixel-art living wallpaper: the farm follows the clock, the seasons and the real weather, a little whale girl lives inside it, and the whole soundscape — ambience and a looping tune — is generated from scratch.",
   "localizedNames": { "zh": "星鲸谷物语" },
