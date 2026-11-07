@@ -2,11 +2,11 @@
   "name": "星鲸谷物语",
   "icon": "leaf.fill",
   "color": "rgba(122, 176, 92, 1)",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "runInApp": true,
-  "description": "Starwhale Valley — a pixel-art living wallpaper: the farm follows the clock, the seasons and the real weather, a little whale girl lives inside it, and the whole soundscape is generated from scratch.",
+  "description": "Starwhale Valley — a pixel-art living wallpaper: the farm follows the clock, the seasons and the real weather, a little whale girl lives inside it, and the whole soundscape — ambience and a looping tune — is generated from scratch.",
   "localizedNames": { "zh": "星鲸谷物语" },
   "localizedDescriptions": {
-    "zh": "星鲸谷物语 Starwhale Valley——像素风动态壁纸，农场随昼夜、季节与真实天气变幻，里面还住着一只小鲸鱼，风声雨声和脚步都是算出来的。"
+    "zh": "星鲸谷物语 Starwhale Valley——像素风动态壁纸，农场随昼夜、季节与真实天气变幻，里面还住着一只小鲸鱼，风声雨声脚步和背景音乐都是算出来的。"
   }
 }

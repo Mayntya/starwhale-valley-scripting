@@ -27,6 +27,7 @@ import {
   type SfxName,
   mixFor,
 } from "./amb"
+import { MUSIC_BARS, MUSIC_LEN, MUSIC_SR, finishMusic, renderMusicBars } from "./music"
 
 /** 每层的固定增益：把「权重」翻译成「听感」。嫌吵改这里 */
 const GAIN: Record<LayerName, number> = {
@@ -41,7 +42,7 @@ const GAIN: Record<LayerName, number> = {
 export const MASTER = [0, 0.5, 0.9]
 
 /** 合成算法改了就升这个号，旧缓存自动作废 */
-const CACHE_KEY = "amb-v1"
+const CACHE_KEY = "amb-v2"
 
 export type AudioLevel = 0 | 1 | 2
 
@@ -75,6 +76,19 @@ let starting = false
 let ready = false
 let failed = false
 let level: AudioLevel = 1
+
+/* 音乐是单独一条链：环境音归环境音，曲子归曲子，两边能各自关 */
+type MusicSlot = { player: AVAudioPlayerNode; mixer: AVAudioMixerNode }
+let musicSlot: MusicSlot | null = null
+let musicBooting = false
+let musicDead = false
+/** BGM 的整体底噪：压到环境音下面一点，它是背景，不是主角 */
+const MUSIC_GAIN = 0.62
+/** 音乐三档，0 就是「只要白噪音，别放曲」 */
+export const MUSIC_MASTER = [0, 0.5, 1]
+let musicLevel: AudioLevel = 1
+let musicCur = 0
+let musicWant = 0
 
 let fadeTimer: ReturnType<typeof setTimeout> | null = null
 /** 图操作串行队列 */
@@ -189,6 +203,7 @@ export function audioStop(): void {
   void serial(async () => {
     try {
       for (const slot of sfxNodes) if (slot) await slot.player.stop()
+      if (musicSlot) await musicSlot.player.stop()
       for (const name of LAYERS) {
         const l = layers[name]
         if (l.player) await l.player.stop()
@@ -202,6 +217,9 @@ export function audioStop(): void {
       engine = null
       master = null
       sfxNodes = [null, null, null]
+      musicSlot = null
+      musicCur = 0
+      musicWant = 0
       for (const name of LAYERS) {
         const l = layers[name]
         l.player = null
@@ -248,6 +266,73 @@ export function toggleMute(): AudioLevel {
 }
 
 /* ------------------------------------------------------------------ */
+/* 音乐                                                                */
+/* ------------------------------------------------------------------ */
+
+export function getMusicLevel(): AudioLevel {
+  return musicLevel
+}
+
+export function cycleMusic(): AudioLevel {
+  musicLevel = ((musicLevel + 1) % 3) as AudioLevel
+  return musicLevel
+}
+
+/** 曲子要多少音量（不包含淡变状态，淡变在 fadeTimer 里追） */
+function musicTarget(hour: number, enabled: boolean): number {
+  if (!enabled) return 0
+  // 深夜自动再压一截：凌晨两点的农场比下午更像「打着盹」
+  const night = hour >= 22 || hour < 6 ? 0.72 : 1
+  return MUSIC_GAIN * MUSIC_MASTER[musicLevel] * night
+}
+
+/**
+ * 建音乐链。第一次运行要现算 38 秒的曲子，所以分四段算、每段中间让出一帧，
+ * 否则开局会卡两三秒。（之后从缓存读盘，几十毫秒。）
+ */
+async function bootMusic(): Promise<void> {
+  if (musicDead || musicSlot || !engine || !master) return
+  musicBooting = true
+  try {
+    const path = cacheDir() + "/music.wav"
+    if (!FileManager.existsSync(path)) {
+      const out = new Float32Array(MUSIC_LEN)
+      for (let bar = 0; bar < MUSIC_BARS; bar += 4) {
+        renderMusicBars(out, bar, Math.min(bar + 4, MUSIC_BARS))
+        await new Promise<void>((r) => setTimeout(r, 16))
+      }
+      FileManager.writeAsBytesSync(path, encodeWav16(finishMusic(out), MUSIC_SR))
+    }
+    const file = await AVAudioFile.openForReading(path, { sampleType: "float32" })
+    let buffer: AVAudioPCMBuffer
+    try {
+      const st = await file.getState()
+      buffer = await file.read(st.length)
+    } finally {
+      await file.close()
+    }
+    if (buffer.frameLength === 0) throw new Error("empty music buffer")
+
+    const player = await AVAudioPlayerNode.create()
+    const mixer = await AVAudioMixerNode.create()
+    await engine.attach(player)
+    await engine.attach(mixer)
+    await engine.connect(player, mixer, { toBus: 0, format: buffer.format })
+    const bus = await master.getNextAvailableInputBus()
+    await engine.connect(mixer, master, { toBus: bus })
+    await mixer.setOutputVolume(0)
+    await player.scheduleBuffer(buffer, { loops: true })
+    await player.play()
+    musicSlot = { player, mixer }
+  } catch (e) {
+    musicDead = true
+    console.log("[audio] 音乐没建起来：", String(e))
+  } finally {
+    musicBooting = false
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* 每层的创建与推进                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -285,6 +370,7 @@ function applyLevels(): void {
     const v = Math.max(0, Math.min(1, l.cur)) * GAIN[name]
     void l.mixer.setOutputVolume(v).catch(() => undefined)
   }
+  if (musicSlot) void musicSlot.mixer.setOutputVolume(Math.max(0, Math.min(1, musicCur))).catch(() => undefined)
 }
 
 /** 80ms 一步把 cur 逼近 want；全部到位就自己停，不常驻 */
@@ -300,6 +386,13 @@ function startFadeTimer(): void {
         continue
       }
       l.cur += d * 0.18
+      moving = true
+    }
+    // 曲子淡得比环境音慢（0.04/80ms，两三秒才淡进来），不会突然把人惊到
+    const dm = musicWant - musicCur
+    if (Math.abs(dm) < 0.004) musicCur = musicWant
+    else {
+      musicCur += dm * 0.04
       moving = true
     }
     applyLevels()
@@ -335,6 +428,17 @@ export function audioUpdate(hour: number, weather: AmbWeather, season: AmbSeason
       void serial(() => bootLayer(name))
     }
   }
+
+  musicWant = level > 0 ? musicTarget(hour, enabled) : 0
+  // 环境音的那几层都就位了，再把曲子接上（建链要动引擎图，不想和图层抢）
+  const pending = LAYERS.some((n) => {
+    const l = layers[n]
+    return l.want > 0.02 && !l.player && !l.dead
+  })
+  if (!pending && musicWant > 0.02 && !musicSlot && !musicBooting && !musicDead) {
+    void serial(bootMusic)
+  }
+
   startFadeTimer()
 }
 
@@ -404,5 +508,6 @@ export async function audioStatus(): Promise<string> {
     parts.push(name + "=" + (on ? "on" : "off") + "/" + l.cur.toFixed(2) + "->" + l.want.toFixed(2))
   }
   parts.push("sfx=" + sfxNodes.filter((s) => s !== null).length + "/3")
+  parts.push("music=" + (musicSlot ? (await musicSlot.player.isPlaying() ? "on" : "off") : "-") + "/" + musicCur.toFixed(2) + "->" + musicWant.toFixed(2) + "@" + musicLevel)
   return parts.join(" ")
 }

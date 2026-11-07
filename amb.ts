@@ -119,38 +119,73 @@ export function wind(): Float32Array {
   return normalize(loopMix(raw, n, fade), 0.085)
 }
 
-/** 雨：高通嘶声 + 中频雨幕 + 每秒四十来颗雨点砸在叶子上的「嗒」 */
+/**
+ * 雨：要的是「有条不紊的喔啦啦」，不是电视噪点。
+ *  - 主体：白噪声走**三级**低通（每级 ~770Hz），3k 以上几乎没东西，没有嘶噪；
+ *  - 体感：极慢一阶低通叠出雨的「厚」，像远处一片雨幕；
+ *  - 雨点：极稀疏、极轻的「噗」（低通噪声慢起包），不是密集高频嗒声；
+ *  - 眉檐滴水：偶尔一颗下滑的水珠，给安静里添一点生气。
+ * 起伏只有一个 ±17% 的慢涌，不做快调制 —— 快调制就是噪点的来源。
+ */
 export function rain(): Float32Array {
   const n = Math.round(8 * SR)
-  const fade = Math.round(0.35 * SR)
-  const warm = SR
+  const fade = Math.round(0.6 * SR)
+  const warm = SR * 2
   const r = rng(0x7a13)
   const raw = new Float32Array(n + fade)
-  let lp = 0
-  let lp2 = 0
+  let h1 = 0
+  let h2 = 0
+  let h3 = 0
+  let b1 = 0
   for (let i = -warm; i < n + fade; i++) {
     const w = r() * 2 - 1
-    lp += 0.55 * (w - lp)
-    lp2 += 0.055 * (w - lp2)
+    // 三级串联低通（每级 fc≈770Hz）：3kHz 以上被压到 -30dB 以下，听感是「雾蒙蒙的一片雨」而不是嘶嘶声
+    h1 += 0.22 * (w - h1)
+    h2 += 0.22 * (h1 - h2)
+    h3 += 0.22 * (h2 - h3)
+    b1 += 0.045 * (w - b1) // 约 160Hz，雨幕的「厚度」
     if (i < 0) continue
-    const hiss = w - lp
-    const body = lp - lp2
-    const gust = 0.85 + 0.15 * Math.sin(TAU * 3 * ((i % n) / n))
-    raw[i] = (hiss * 0.8 + body * 1.5) * gust
+    const u = (i % n) / n
+    // 慢到几乎察不到的呼吸：8 秒里走 1 圈和 2 圈，深度一半一半
+    const swell = 1 + 0.11 * Math.sin(TAU * u + 0.7) + 0.06 * Math.sin(TAU * 2 * u + 2.1)
+    raw[i] = (h3 * 1.6 + b1 * 0.55) * swell
   }
-  // 雨点：短、亮、带个小尾巴，比单纯白噪声更像「下雨」而不是「沙沙」
-  const drops = 8 * 42
-  for (let k = 0; k < drops; k++) {
-    const at = Math.floor(r() * (n - 400))
-    const f = 1900 + r() * 3200
-    const amp = 0.045 + r() * 0.1
-    const len = Math.round(SR * (0.003 + r() * 0.005))
-    for (let j = 0; j < len; j++) {
-      const e = Math.exp(-j / (len * 0.34))
-      raw[at + j] += Math.sin((TAU * f * j) / SR) * amp * e
+
+  // 雨点：先做一颗「噗」（低通噪声短包，起音 12ms 够慢，不炸宽带），复用 100 多次，省得每次重算
+  const patLen = Math.round(0.07 * SR)
+  const pat = new Float32Array(patLen)
+  let p = 0
+  for (let j = 0; j < patLen; j++) {
+    p += 0.05 * (r() * 2 - 1 - p)
+    const e = Math.min(1, j / (SR * 0.012)) * Math.exp(-j / (patLen * 0.35))
+    pat[j] = p * e
+  }
+  const patter = 8 * 6 // 每秒六颗。再密就不是「雨」，是「沙」
+  for (let k = 0; k < patter; k++) {
+    const at = Math.floor(r() * n)
+    const amp = 0.35 + r() * 0.35
+    for (let j = 0; j < patLen; j++) {
+      // 越过 n 的部分落在交叉淡化区里，等于自然绕回开头，接缝不会断
+      raw[at + j] += pat[j] * amp
     }
   }
-  return normalize(loopMix(raw, n, fade), 0.115)
+
+  // 眉檐滴水：一两声轻巧的下滑水珠，比任何噪声都更像「下雨」
+  for (let k = 0; k < 5; k++) {
+    const at = Math.floor(r() * (n - SR * 0.4))
+    const f0 = 1150 + r() * 500
+    const len = Math.round(SR * 0.16)
+    let ph = 0
+    for (let j = 0; j < len; j++) {
+      const t = j / len
+      const f = f0 * (1 - 0.42 * t)
+      ph += (TAU * f) / SR
+      const e = Math.min(1, j / (SR * 0.003)) * Math.exp(-4.2 * t) * 0.055
+      raw[at + j] += Math.sin(ph) * e
+    }
+  }
+
+  return normalize(loopMix(raw, n, fade), 0.1)
 }
 
 /** 雪/雾：更低更闷的一层底噪，两拍一次的缓慢起伏。它不是「声音」，是「安静的形状」 */

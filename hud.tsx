@@ -29,6 +29,8 @@ export const SPEEDS = [1, 60, 600]
 export const SPEED_LABEL = ["实时", "×60", "×600"]
 /** 三档音量：静音 / 轻 / 响。字少是因为面板上要塞得下 */
 export const VOL_LABEL = ["◌ 静音", "♪ 轻", "♪♪ 响"]
+/** 曲子单独的开关：很多人想要白噪音但不要旋律 */
+export const MUSIC_LABEL = ["♫ 关", "♫ 轻", "♫♫ 响"]
 
 function clockText(ms: number): string {
   const d = new Date(ms)
@@ -62,6 +64,8 @@ export type HudProps = {
   paused: boolean
   /** 0 静音 / 1 轻 / 2 响 */
   level: 0 | 1 | 2
+  /** BGM 三档，同上 */
+  music: 0 | 1 | 2
   visible: boolean
   tick: number
   /** 小人刚碰了什么（世界给的台词），没有就显示默认提示 */
@@ -71,6 +75,7 @@ export type HudProps = {
   onWeather: () => void
   onSeason: () => void
   onVolume: () => void
+  onMusic: () => void
   onToggle: () => void
   /** 只有全屏模态才给退出键；首页标签里退出会杀掉常驻实例，所以留空 */
   onExit?: () => void
@@ -180,6 +185,7 @@ export function FarmHud(props: HudProps) {
             onTap={props.onSeason}
           />
           <Chip label={VOL_LABEL[props.level]} active={props.level > 0} onTap={props.onVolume} />
+          <Chip label={MUSIC_LABEL[props.music]} active={props.music > 0} onTap={props.onMusic} />
           <Spacer />
           <Chip label="◱ 收起" onTap={props.onToggle} />
         </HStack>

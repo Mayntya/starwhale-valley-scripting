@@ -18,7 +18,9 @@ import {
   audioStart,
   audioStop,
   audioUpdate,
+  cycleMusic,
   getAudioLevel,
+  getMusicLevel,
   playSfx,
   playThunder,
   setAudioLevel,
@@ -54,6 +56,7 @@ export function FarmView(props: { onExit?: () => void }) {
   const [snap, setSnap] = useState<WeatherSnapshot | null>(null)
   const [tick, setTick] = useState(0)
   const [vol, setVol] = useState<AudioLevel>(getAudioLevel())
+  const [music, setMusic] = useState<AudioLevel>(getMusicLevel())
 
   // 虚拟时钟：壁纸自己走的时间，可以被加速
   const clockRef = useRef({ ms: Date.now(), last: 0 })
@@ -215,6 +218,7 @@ export function FarmView(props: { onExit?: () => void }) {
         speedIdx={speedIdx}
         paused={paused}
         level={vol}
+        music={music}
         visible={hud}
         tick={tick}
         note={player.liveNote}
@@ -239,6 +243,10 @@ export function FarmView(props: { onExit?: () => void }) {
           const next = ((vol + 1) % 3) as AudioLevel
           setAudioLevel(next)
           setVol(next)
+        }}
+        onMusic={() => {
+          touchRef.current = Date.now()
+          setMusic(cycleMusic())
         }}
         onToggle={toggleHud}
         onExit={onExit}
