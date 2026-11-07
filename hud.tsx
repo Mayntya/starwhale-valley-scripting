@@ -27,6 +27,8 @@ const EDGE_ON = { style: GOLD, width: 0.6 }
 
 export const SPEEDS = [1, 60, 600]
 export const SPEED_LABEL = ["实时", "×60", "×600"]
+/** 三档音量：静音 / 轻 / 响。字少是因为面板上要塞得下 */
+export const VOL_LABEL = ["◌ 静音", "♪ 轻", "♪♪ 响"]
 
 function clockText(ms: number): string {
   const d = new Date(ms)
@@ -58,6 +60,8 @@ export type HudProps = {
   seasonAuto: boolean
   speedIdx: number
   paused: boolean
+  /** 0 静音 / 1 轻 / 2 响 */
+  level: 0 | 1 | 2
   visible: boolean
   tick: number
   /** 小人刚碰了什么（世界给的台词），没有就显示默认提示 */
@@ -66,6 +70,7 @@ export type HudProps = {
   onPause: () => void
   onWeather: () => void
   onSeason: () => void
+  onVolume: () => void
   onToggle: () => void
   /** 只有全屏模态才给退出键；首页标签里退出会杀掉常驻实例，所以留空 */
   onExit?: () => void
@@ -174,6 +179,7 @@ export function FarmHud(props: HudProps) {
             active={!seasonAuto}
             onTap={props.onSeason}
           />
+          <Chip label={VOL_LABEL[props.level]} active={props.level > 0} onTap={props.onVolume} />
           <Spacer />
           <Chip label="◱ 收起" onTap={props.onToggle} />
         </HStack>

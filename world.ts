@@ -1026,6 +1026,13 @@ const SPOTS: Spot[] = [
 ]
 
 /** 走到东西旁边就触一下；移动中不触发，免得跑过田也弹字 */
+let spotHook: ((id: SpotId) => void) | null = null
+
+/** 碰触真的成功了才叫；音频那边按 SpotId 配音效 */
+export function onSpotTouch(fn: ((id: SpotId) => void) | null) {
+  spotHook = fn
+}
+
 function touchSpots(now: number, season: Season) {
   if (player.moving || player.cool > 0) return
   let best: Spot | null = null
@@ -1037,7 +1044,7 @@ function touchSpots(now: number, season: Season) {
       bestD = d
     }
   }
-  if (best) react(best.id, now, best.line(season))
+  if (best && react(best.id, now, best.line(season))) spotHook?.(best.id)
 }
 
 /* ------------------------------------------------------------------ */

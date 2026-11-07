@@ -92,6 +92,17 @@ export function pulse(id: SpotId, now: number): number {
   return k >= 1 ? 0 : 1 - k
 }
 
+/* ------------------------------------------------------------------ */
+/* 脚步声                                                              */
+/* ------------------------------------------------------------------ */
+
+let stepHook: (() => void) | null = null
+
+/** 每迈一步叫一次（传 null 关掉）；player 自己不碰音频，音频那边接这个 */
+export function onFootstep(fn: (() => void) | null) {
+  stepHook = fn
+}
+
 export function updatePlayer(dt: number, now: number) {
   const p = player
   const dx = p.tx - p.x
@@ -103,7 +114,10 @@ export function updatePlayer(dt: number, now: number) {
     p.x += (dx / d) * step
     p.y += (dy / d) * step
     p.moving = true
+    const before = Math.floor(p.step / Math.PI)
     p.step += dt * 8.5
+    // sin(step) 每过 π 落一次脚，步频跟腿摆完全同步
+    if (stepHook && Math.floor(p.step / Math.PI) !== before) stepHook()
     if (Math.abs(dx) > 0.3) p.face = dx > 0 ? 1 : -1
   } else {
     if (p.moving) {
