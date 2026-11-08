@@ -413,12 +413,13 @@ export function rustle(): Float32Array {
   return normalizePeak(out, 0.34)
 }
 
-/** 雷：远雷，不是炸雷。几个鼓包从低到高滚过去，尾巴拉长 */
+/** 雷：远雷，不是炸雷。一个鼓包 + 一条单调长衰减，不做「回声」 */
 export function thunder(): Float32Array {
   // 「厚」不是低频堆出来的，是「慢起音 + 长尾巴 + 中低频实心」。
   // 快起音 = 脆，高频瞬态 = 脆；所以主击改成 50ms 慢起音，裂声只留一丝。
-  // 体 = 180Hz 两极点（胸腔感）；厚 = 700Hz 低通（小喇叭真正推得动的段）；裂 = 1kHz 高通（只占 1/10）
-  const DUR = 5.4
+  // 体 = 180Hz 两极点（胸腔感）；厚 = 150–500Hz + 700Hz（小喇叭真正推得动的段）；裂 = 1kHz 高通（只占一丝）
+  // 一次雷只能有【一个】鼓包：以前在 1.0 / 2.5 / 4.0 秒各放一个，听感就是「回声」重复三遍。
+  const DUR = 4.0
   const out = new Float32Array(Math.round(DUR * SR))
   const r = rng(0x11e7)
   const N = out.length
@@ -442,22 +443,17 @@ export function thunder(): Float32Array {
     hp += 0.3 * (w - hp)
     const crack = w - hp
 
-    // 主击：50ms 慢起音 + 慢衰减（1.1s 的时间常数）
+    // 主击：50ms 慢起音 + 单调长衰减（时间常数 1.05s）
     const atk = Math.min(1, t / 0.05)
-    const main = atk * Math.exp(-t * 0.8)
-    // 滚落：三波越来越低越来越散，像在远处山谷里转一圈回来
-    const roll =
-      0.55 * Math.exp(-((t - 1) * (t - 1)) / 0.34) +
-      0.32 * Math.exp(-((t - 2.5) * (t - 2.5)) / 0.5) +
-      0.17 * Math.exp(-((t - 4) * (t - 4)) / 0.66)
-    const wob = 0.78 + 0.22 * Math.sin(TAU * 2.1 * t + 0.5)
-    const env = main + roll * wob
+    // 极浅的单向慢起伏：让尾巴有点「滚」的质感，但不成脉冲
+    const swell = 0.9 + 0.1 * Math.sin(TAU * 0.8 * t + 0.6)
+    const env = atk * Math.exp(-t * 0.95) * swell
     const edge = 0.16 * Math.exp(-t * 18) * atk
     out[i] = b2 * env * 1.9 + m1b * env * 2.6 + m2 * env * 3.4 + crack * edge * 0.25
   }
 
-  // 尾巴 0.7s 收干净：闪电密的时候雷会连着来，硬切在最后一个样本上会“咕”一声
-  const fadeLen = Math.round(0.7 * SR)
+  // 尾巴 0.6s 收干净：闪电密的时候雷会连着来，硬切在最后一个样本上会“咕”一声
+  const fadeLen = Math.round(0.6 * SR)
   for (let i = N - fadeLen; i < N; i++) {
     const q = (N - i) / fadeLen
     out[i] *= q * q
