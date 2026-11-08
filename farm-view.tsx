@@ -211,6 +211,8 @@ export function FarmView(props: { onExit?: () => void }) {
             const w = tapToWorld({ x: pt.x, y: pt.y })
             moveTo(w.x, w.y)
             touchRef.current = Date.now()
+            // 顺便把面板叫回来 —— 收起来之后光靠角落里那颗小点找不到出口
+            setHud(true)
           },
         }}
       />

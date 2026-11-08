@@ -100,21 +100,29 @@ export function FarmHud(props: HudProps) {
             : "推算天气"
 
   if (!visible) {
+    // 收起来之后只留一颗「叫回面板」的按钮。
+    // 注意：VStack(alignment: trailing) 不会把子视图顶到右边（实测会居中），
+    // 靠右必须用 HStack + Spacer + maxWidth infinity。
     return (
       <VStack
-        alignment="trailing"
+        spacing={0}
         frame={{ maxWidth: "infinity", maxHeight: "infinity" }}
-        padding={14}
+        padding={{ horizontal: 14, top: 14, bottom: 24 }}
       >
         <Spacer />
-        <Text
-          font={{ name: "Menlo-Bold", size: 9 }}
-          foregroundStyle="rgba(242,239,228,0.30)"
-          padding={{ horizontal: 9, vertical: 7 }}
-          onTapGesture={props.onToggle}
-        >
-          {"▤"}
-        </Text>
+        <HStack frame={{ maxWidth: "infinity" }}>
+          <Spacer />
+          <Text
+            font={{ name: "Menlo-Bold", size: 11 }}
+            foregroundStyle={DIM}
+            padding={{ horizontal: 11, vertical: 8 }}
+            background={PANEL}
+            border={EDGE}
+            onTapGesture={props.onToggle}
+          >
+            {"▤ 面板"}
+          </Text>
+        </HStack>
       </VStack>
     )
   }
