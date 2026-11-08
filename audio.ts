@@ -42,7 +42,7 @@ const GAIN: Record<LayerName, number> = {
 export const MASTER = [0, 0.5, 0.9]
 
 /** 合成算法改了就升这个号，旧缓存自动作废 */
-const CACHE_KEY = "amb-v4"
+const CACHE_KEY = "amb-v5"
 
 export type AudioLevel = 0 | 1 | 2
 

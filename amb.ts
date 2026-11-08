@@ -418,13 +418,16 @@ export function thunder(): Float32Array {
   // 「厚」不是低频堆出来的，是「慢起音 + 长尾巴 + 中低频实心」。
   // 快起音 = 脆，高频瞬态 = 脆；所以主击改成 50ms 慢起音，裂声只留一丝。
   // 体 = 180Hz 两极点（胸腔感）；厚 = 700Hz 低通（小喇叭真正推得动的段）；裂 = 1kHz 高通（只占 1/10）
-  const DUR = 4.8
+  const DUR = 5.4
   const out = new Float32Array(Math.round(DUR * SR))
   const r = rng(0x11e7)
   const N = out.length
   let b1 = 0
   let b2 = 0
   let m1 = 0
+  let m1b = 0
+  let m2 = 0
+  let lhp = 0
   let hp = 0
   for (let i = 0; i < N; i++) {
     const t = i / SR
@@ -432,25 +435,29 @@ export function thunder(): Float32Array {
     b1 += 0.05 * (w - b1)
     b2 += 0.05 * (b1 - b2)
     m1 += 0.19 * (w - m1)
+    m1b += 0.19 * (m1 - m1b)
+    // 「胸口的重量」：150–500Hz 带通。小喇叭推得动，而且人耳把这一段读成「厚」
+    lhp += 0.043 * (w - lhp)
+    m2 += 0.14 * (w - lhp - m2)
     hp += 0.3 * (w - hp)
     const crack = w - hp
 
     // 主击：50ms 慢起音 + 慢衰减（1.1s 的时间常数）
     const atk = Math.min(1, t / 0.05)
-    const main = atk * Math.exp(-t * 0.9)
+    const main = atk * Math.exp(-t * 0.8)
     // 滚落：三波越来越低越来越散，像在远处山谷里转一圈回来
     const roll =
-      0.55 * Math.exp(-((t - 1) * (t - 1)) / 0.3) +
-      0.3 * Math.exp(-((t - 2.3) * (t - 2.3)) / 0.45) +
-      0.15 * Math.exp(-((t - 3.6) * (t - 3.6)) / 0.6)
+      0.55 * Math.exp(-((t - 1) * (t - 1)) / 0.34) +
+      0.32 * Math.exp(-((t - 2.5) * (t - 2.5)) / 0.5) +
+      0.17 * Math.exp(-((t - 4) * (t - 4)) / 0.66)
     const wob = 0.78 + 0.22 * Math.sin(TAU * 2.1 * t + 0.5)
     const env = main + roll * wob
-    const edge = 0.22 * Math.exp(-t * 16) * atk
-    out[i] = b2 * env * 1.7 + m1 * env * 2.4 + crack * edge * 0.35
+    const edge = 0.16 * Math.exp(-t * 18) * atk
+    out[i] = b2 * env * 1.9 + m1b * env * 2.6 + m2 * env * 3.4 + crack * edge * 0.25
   }
 
-  // 尾巴 0.6s 收干净：闪电密的时候雷会连着来，硬切在最后一个样本上会“咕”一声
-  const fadeLen = Math.round(0.6 * SR)
+  // 尾巴 0.7s 收干净：闪电密的时候雷会连着来，硬切在最后一个样本上会“咕”一声
+  const fadeLen = Math.round(0.7 * SR)
   for (let i = N - fadeLen; i < N; i++) {
     const q = (N - i) / fadeLen
     out[i] *= q * q

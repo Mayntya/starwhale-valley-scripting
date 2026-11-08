@@ -1091,15 +1091,22 @@ function drawFog(b: Brush, t: number, strength: number) {
   }
 }
 
-/** 闪电的节拍：每 2.8 秒一个槽位，一半的槽位真的闪，闪 0.36 秒。
+/** 闪电的节拍：每 2.8 秒一个「槽位」，约三成真的闪，闪 0.36 秒（平均 10 秒一道，雷 5 秒左右，不打架）。
  *  画面和声音都从这里取，所以雷一定跟着闪电走 —— 两边各算一套就会割裂。 */
 export const FLASH_SEG = 2.8
+
+/** 槽位真的会闪的门槛：hash 是 [0,1) 均匀分布，0.73 => 约 27%（平均 3.7 个槽位一次）*/
+const FLASH_CHANCE = 0.73
+/** 真正亮起前在槽位里随机拖一下，免得每次都卡在 2.8s 的节拍上（听着像机器）*/
+const FLASH_SKEW = 1.6
 
 export function flashAt(t: number) {
   const n = Math.floor(t / FLASH_SEG)
   const local = t - n * FLASH_SEG
-  const lit = hash(n * 3.71) >= 0.5
-  return { n, local, lit, visible: lit && local <= 0.36 }
+  const lit = hash(n * 3.71) >= FLASH_CHANCE
+  // on = 槽位内的实际起点（0～1.6s 随机），闪 0.36 秒
+  const on = local - hash(n * 9.13) * FLASH_SKEW
+  return { n, local: on, lit, visible: lit && on >= 0 && on <= 0.36 }
 }
 
 function drawLightning(b: Brush, t: number) {
