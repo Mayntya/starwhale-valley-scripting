@@ -3,7 +3,8 @@
  * 刻意做得很轻：一块时钟、一块天气、一排小按钮，不抢画面。
  */
 
-import { VStack, HStack, Spacer, Text } from "scripting"
+import { VStack, HStack, Spacer, Text, RoundedRectangle } from "scripting"
+import type { ShapeStyle } from "scripting"
 import {
   pad2,
   phaseLabel,
@@ -18,12 +19,24 @@ const INK = "#f2efe4" as const
 const DIM = "rgba(242,239,228,0.55)" as const
 const FAINT = "rgba(242,239,228,0.34)" as const
 const GOLD = "#e8c07a" as const
-const PANEL = {
-  style: "rgba(8,12,18,0.58)" as const,
-  shape: { type: "rect" as const, cornerRadius: 9 },
+const PANEL_FILL = "rgba(8,12,18,0.58)" as const
+const PANEL_EDGE = "rgba(255,255,255,0.13)" as const
+
+/**
+ * 背景板。★必须用 <RoundedRectangle> 把填色和描边一起带上。
+ * 坑（已实测）：background={{ style, shape: { type: "rect", cornerRadius } }}
+ * 里的 shape 会被忽略，照样画直角矩形；border 也只接受 { style, width }，
+ * 永远是直角外框。想要圆角，只能把形状当一个视图塞进 background。
+ */
+function plate(radius: number, fill: ShapeStyle = PANEL_FILL, edge: ShapeStyle = PANEL_EDGE) {
+  return (
+    <RoundedRectangle
+      cornerRadius={radius}
+      fill={fill}
+      stroke={{ shapeStyle: edge, strokeStyle: { lineWidth: 1.2 } }}
+    />
+  )
 }
-const EDGE = { style: "rgba(255,255,255,0.13)" as const, width: 0.6 }
-const EDGE_ON = { style: GOLD, width: 0.6 }
 
 export const SPEEDS = [1, 60, 600]
 export const SPEED_LABEL = ["实时", "×60", "×600"]
@@ -44,8 +57,7 @@ function Chip(props: { label: string; active?: boolean; onTap: () => void }) {
       font={{ name: "Menlo-Bold", size: 10 }}
       foregroundStyle={active ? "#1a1408" : INK}
       padding={{ horizontal: 10, vertical: 7 }}
-      background={active ? { style: GOLD, shape: { type: "rect", cornerRadius: 7 } } : PANEL}
-      border={active ? EDGE_ON : EDGE}
+      background={active ? plate(7, GOLD, GOLD) : plate(7)}
       onTapGesture={onTap}
     >
       {label}
@@ -116,8 +128,7 @@ export function FarmHud(props: HudProps) {
             font={{ name: "Menlo-Bold", size: 11 }}
             foregroundStyle={DIM}
             padding={{ horizontal: 11, vertical: 8 }}
-            background={PANEL}
-            border={EDGE}
+            background={plate(9)}
             onTapGesture={props.onToggle}
           >
             {"▤ 面板"}
@@ -139,8 +150,7 @@ export function FarmHud(props: HudProps) {
           alignment="leading"
           spacing={3}
           padding={{ horizontal: 12, vertical: 9 }}
-          background={PANEL}
-          border={EDGE}
+          background={plate(9)}
         >
           <HStack spacing={7} alignment="firstTextBaseline">
             <Text font={{ name: "Menlo-Bold", size: 30 }} foregroundStyle={INK}>
@@ -164,8 +174,7 @@ export function FarmHud(props: HudProps) {
           alignment="trailing"
           spacing={4}
           padding={{ horizontal: 11, vertical: 9 }}
-          background={PANEL}
-          border={EDGE}
+          background={plate(9)}
           onTapGesture={props.onWeather}
         >
           <Text font={{ name: "Menlo-Bold", size: 15 }} foregroundStyle={INK}>
@@ -203,7 +212,7 @@ export function FarmHud(props: HudProps) {
             font={{ name: "Menlo", size: 8 }}
             foregroundStyle={DIM}
             padding={{ horizontal: 8, vertical: 5 }}
-            background={PANEL}
+            background={plate(9)}
           >
             {props.note && props.note.length > 0
               ? props.note
@@ -217,8 +226,7 @@ export function FarmHud(props: HudProps) {
               font={{ name: "Menlo-Bold", size: 9 }}
               foregroundStyle={GOLD}
               padding={{ horizontal: 9, vertical: 6 }}
-              background={PANEL}
-              border={EDGE}
+              background={plate(7)}
               onTapGesture={props.onExit}
             >
               {"✕ 退出"}
